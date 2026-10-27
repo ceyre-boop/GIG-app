@@ -1,0 +1,1259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- pwa-head -->
+<meta name="theme-color" content="#F6F7F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121614" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Pick up paid side quests near you: errands, moving help, pet walks and more.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sidequest">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<!-- /pwa-head -->
+<title>Sidequest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one-column phone app. Sticky header, orienteering map card, quest list, fixed tab bar, bottom sheets. */
+:root {
+  --paper: #F6F7F2;
+  --surface: #FFFFFF;
+  --sunk: #ECEFE8;
+  --ink: #1D2321;
+  --muted: #5F6B66;
+  --line: #DCE1DA;
+  --contour: #C26A35;
+  --overprint: #B0168F;
+  --overprint-soft: #F6E3F0;
+  --open: #F2B33D;
+  --veg: #CFE8C9;
+  --water: #2A86CC;
+  --good: #2F8A52;
+  --flag: #F26B1D;
+  --on-accent: #FFFFFF;
+  --shadow: 0 1px 2px rgba(29,35,33,.06), 0 8px 24px rgba(29,35,33,.08);
+
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --nav-h: 64px;
+  --r: 14px;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121614; --surface: #1B201E; --sunk: #232927; --ink: #ECEFEA; --muted: #9AA59F; --line: #2E3532;
+    --contour: #9A5A33; --overprint: #E55BC8; --overprint-soft: #3A1E33; --open: #E8B24C; --veg: #213326;
+    --water: #5AAEEA; --good: #5DBE7F; --flag: #F47B33; --on-accent: #1B0A16;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121614; --surface: #1B201E; --sunk: #232927; --ink: #ECEFEA; --muted: #9AA59F; --line: #2E3532;
+  --contour: #9A5A33; --overprint: #E55BC8; --overprint-soft: #3A1E33; --open: #E8B24C; --veg: #213326;
+  --water: #5AAEEA; --good: #5DBE7F; --flag: #F47B33; --on-accent: #1B0A16;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px/1.45 var(--f-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 30; background: var(--paper);
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--overprint); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.eyebrow {
+  font: 700 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+}
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---------- App shell ---------- */
+.app { max-width: 560px; margin: 0 auto; padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 24px); }
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  padding-block: 12px 10px; padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+  display: flex; align-items: center; gap: 12px;
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.brand-mark { width: 30px; height: 30px; flex: none; }
+.brand-name {
+  font: 850 22px/1 var(--f-display); font-stretch: 118%; letter-spacing: -.01em;
+}
+.brand-sub { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.brand-sub svg { width: 13px; height: 13px; }
+.lvl-pill {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 6px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); flex: none;
+}
+.lvl-ring { width: 30px; height: 30px; position: relative; }
+.lvl-ring svg { width: 30px; height: 30px; transform: rotate(-90deg); }
+.lvl-ring span { position: absolute; inset: 0; display: grid; place-items: center; font: 700 12px/1 var(--f-mono); }
+.lvl-pill .cash { font: 700 14px/1 var(--f-mono); }
+.lvl-pill .cash small { display: block; font: 600 10px/1.2 var(--f-body); color: var(--muted); }
+
+.screen { padding-left: var(--gutter-l); padding-right: var(--gutter-r); display: grid; gap: 18px; padding-block: 6px 0; }
+.screen[hidden] { display: none !important; }
+.screen-title { font: 850 30px/1.02 var(--f-display); font-stretch: 112%; letter-spacing: -.015em; }
+.screen-head { display: grid; gap: 6px; padding-top: 4px; }
+.screen-head p { margin: 0; color: var(--muted); }
+
+/* ---------- Map ---------- */
+.mapcard {
+  position: relative; border-radius: 18px; overflow: hidden; background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+#map { display: block; width: 100%; height: 230px; touch-action: manipulation; }
+.map-legend {
+  position: absolute; left: 10px; bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;
+  padding: 6px 10px; border-radius: 10px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  font: 600 11px/1 var(--f-body); color: var(--muted);
+}
+.map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.map-legend svg { width: 12px; height: 12px; }
+.map-scale {
+  position: absolute; right: 10px; bottom: 10px; padding: 6px 8px; border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent); font: 700 10px/1 var(--f-mono); color: var(--muted);
+  display: grid; gap: 4px; justify-items: end;
+}
+.map-scale i { display: block; width: 48px; height: 4px; border: 1.5px solid var(--muted); border-top: 0; }
+.map-count {
+  position: absolute; left: 10px; top: 10px; padding: 6px 10px; border-radius: 999px;
+  background: var(--overprint); color: var(--on-accent); font: 700 12px/1 var(--f-body);
+}
+
+/* ---------- Chips ---------- */
+.chips {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  margin-left: calc(-1 * var(--gutter-l)); margin-right: calc(-1 * var(--gutter-r));
+  padding: 2px var(--gutter-r) 2px var(--gutter-l);
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 14px; color: var(--ink);
+}
+.chip svg.i { width: 16px; height: 16px; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.chip[aria-pressed="true"] svg.i { color: var(--paper); }
+
+.listhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.listhead h2 { font: 800 18px/1.1 var(--f-display); font-stretch: 105%; }
+.sort { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunk); }
+.sort button { border: 0; background: transparent; padding: 6px 9px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.sort button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+/* ---------- Quest cards ---------- */
+.quests { display: grid; gap: 10px; }
+.qcard {
+  display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 12px; align-items: center;
+  padding: 12px 14px 12px 12px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line);
+  text-align: left; width: 100%;
+  transition: transform .12s ease;
+}
+.qcard:active { transform: scale(.985); }
+.ctrl {
+  width: 48px; height: 48px; border-radius: 50%; border: 2.5px solid var(--overprint); color: var(--overprint);
+  display: grid; place-items: center; position: relative;
+}
+.ctrl svg.i { width: 20px; height: 20px; }
+.ctrl b {
+  position: absolute; top: -6px; right: -8px; font: 700 10px/1 var(--f-mono); background: var(--overprint); color: var(--on-accent);
+  padding: 3px 4px; border-radius: 5px;
+}
+.ctrl.active { box-shadow: 0 0 0 3px var(--surface), 0 0 0 5.5px var(--overprint); }
+.ctrl.mine { border-style: dashed; }
+.ctrl.done { background: var(--overprint); color: var(--on-accent); }
+.qbody { min-width: 0; display: grid; gap: 3px; }
+.qtitle { font-weight: 700; font-size: 15px; line-height: 1.25; }
+.qmeta { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.qmeta span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.qmeta svg.i { width: 13px; height: 13px; }
+.qtags { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.tag { font: 600 11px/1 var(--f-body); padding: 4px 7px; border-radius: 6px; background: var(--sunk); color: var(--muted); }
+.tag.hot { background: var(--overprint-soft); color: var(--overprint); }
+.diff { display: inline-flex; gap: 2px; align-items: center; }
+.diff i { width: 6px; height: 10px; border-radius: 2px; background: var(--line); }
+.diff i.on { background: var(--contour); }
+.qreward { text-align: right; display: grid; gap: 2px; justify-items: end; }
+.qreward .usd { font: 800 21px/1 var(--f-display); font-stretch: 100%; font-variant-numeric: tabular-nums; }
+.qreward .xp { font: 700 11px/1 var(--f-mono); color: var(--overprint); }
+
+.empty {
+  padding: 28px 18px; border: 1.5px dashed var(--line); border-radius: var(--r); text-align: center; color: var(--muted);
+  display: grid; gap: 10px; justify-items: center;
+}
+.empty h3 { font: 800 17px/1.2 var(--f-display); color: var(--ink); }
+.empty p { margin: 0; max-width: 34ch; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px;
+  padding: 14px 18px; font-weight: 700; font-size: 16px; background: var(--overprint); color: var(--on-accent);
+  min-height: 50px;
+}
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: var(--sunk); color: var(--ink); }
+.btn.line { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.block { width: 100%; }
+.btn.sm { min-height: 38px; padding: 8px 12px; font-size: 14px; border-radius: 10px; }
+
+/* ---------- Tab bar ---------- */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+.tabbar nav { max-width: 560px; margin: 0 auto; height: var(--nav-h); display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; }
+.tab {
+  border: 0; background: transparent; display: grid; justify-items: center; gap: 3px; padding: 6px 0;
+  font-size: 11px; font-weight: 600; color: var(--muted); position: relative;
+}
+.tab svg.i { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--ink); }
+.tab[aria-current="page"]::after {
+  content: ""; position: absolute; top: -1px; width: 22px; height: 3px; border-radius: 0 0 3px 3px; background: var(--overprint);
+}
+.tab .badge {
+  position: absolute; top: 2px; left: calc(50% + 6px); min-width: 17px; height: 17px; border-radius: 9px; padding: 0 4px;
+  background: var(--overprint); color: var(--on-accent); font: 700 10px/17px var(--f-mono);
+}
+.tab-post { display: grid; place-items: center; }
+.tab-post .plus {
+  width: 52px; height: 52px; border-radius: 16px; background: var(--ink); color: var(--paper);
+  display: grid; place-items: center; transform: translateY(-10px); box-shadow: var(--shadow);
+}
+.tab-post .plus svg.i { width: 26px; height: 26px; stroke-width: 2.2; }
+.tab-post[aria-current="page"] .plus { background: var(--overprint); color: var(--on-accent); }
+.tab-post[aria-current="page"]::after { display: none; }
+
+/* ---------- Sheet ---------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 40; background: rgba(10,14,12,.45); opacity: 0; transition: opacity .2s ease;
+}
+.scrim.show { opacity: 1; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: calc(100% - env(safe-area-inset-top, 0px) - 24px);
+  max-width: 560px; margin: 0 auto; background: var(--surface); border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column; transform: translateY(100%); transition: transform .28s cubic-bezier(.2,.8,.2,1);
+  box-shadow: 0 -10px 40px rgba(0,0,0,.18);
+}
+.sheet.show { transform: none; }
+.sheet-grab { padding: 10px 0 4px; display: grid; place-items: center; flex: none; }
+.sheet-grab i { width: 40px; height: 5px; border-radius: 3px; background: var(--line); }
+.sheet-body { overflow-y: auto; padding: 4px var(--gutter-r) 16px var(--gutter-l); display: grid; gap: 18px; overscroll-behavior: contain; }
+.sheet-foot {
+  flex: none; border-top: 1px solid var(--line); padding: 12px var(--gutter-r) calc(12px + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+  display: flex; gap: 10px;
+}
+.sheet-foot .btn { flex: 1; }
+.sheet-close {
+  position: absolute; top: 12px; right: max(14px, env(safe-area-inset-right, 0px)); width: 34px; height: 34px; border-radius: 50%;
+  border: 0; background: var(--sunk); display: grid; place-items: center; color: var(--muted);
+}
+.d-head { display: grid; gap: 8px; padding-right: 40px; }
+.d-title { font: 850 26px/1.05 var(--f-display); font-stretch: 108%; letter-spacing: -.01em; }
+.d-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.d-stat { background: var(--sunk); border-radius: 12px; padding: 10px 8px; display: grid; gap: 4px; min-width: 0; }
+.d-stat b { font: 800 18px/1 var(--f-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.d-stat span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.d-stat.cash b { color: var(--ink); }
+.d-stat.xp b { color: var(--overprint); }
+.poster { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  font: 800 15px/1 var(--f-display); background: var(--veg); color: var(--ink);
+}
+.poster .who { min-width: 0; flex: 1; }
+.poster .who b { display: block; }
+.poster .who span { font-size: 13px; color: var(--muted); }
+.d-section { display: grid; gap: 10px; }
+.d-section h3 { font: 800 15px/1.2 var(--f-display); font-stretch: 105%; }
+.d-section p { margin: 0; color: var(--muted); max-width: 62ch; }
+.when { display: flex; gap: 10px; align-items: center; padding: 12px; border-radius: 12px; border: 1px solid var(--line); }
+.when svg.i { color: var(--overprint); }
+.when div { display: grid; }
+.when span { font-size: 13px; color: var(--muted); }
+
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.step { display: flex; gap: 12px; align-items: flex-start; }
+.step .n {
+  flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--overprint); color: var(--overprint);
+  display: grid; place-items: center; font: 700 11px/1 var(--f-mono);
+}
+.step label { display: flex; gap: 12px; align-items: center; width: 100%; padding: 12px; border-radius: 12px; background: var(--sunk); cursor: pointer; }
+.step input { position: absolute; opacity: 0; pointer-events: none; }
+.step input:checked + .n { background: var(--overprint); color: var(--on-accent); }
+.step input:checked ~ span { text-decoration: line-through; color: var(--muted); }
+.step input:focus-visible + .n { outline: 2px solid var(--overprint); outline-offset: 2px; }
+
+/* ---------- Log ---------- */
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px; gap: 4px; border-radius: 12px; background: var(--sunk); }
+.seg button { border: 0; background: transparent; padding: 9px 6px; border-radius: 9px; font-weight: 700; font-size: 14px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.seg button small { font: 700 11px/1 var(--f-mono); margin-left: 4px; color: var(--overprint); }
+.active-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.active-top { display: grid; grid-template-columns: 48px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 14px; width: 100%; border: 0; background: transparent; text-align: left; }
+.progress { height: 6px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--overprint); border-radius: 3px; transition: width .3s ease; }
+.active-mid { padding: 0 14px 14px; display: grid; gap: 12px; }
+.active-mid .row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.active-foot { display: flex; gap: 8px; padding: 0 14px 14px; }
+.active-foot .btn { flex: 1; }
+
+/* ---------- Post form ---------- */
+.form { display: grid; gap: 18px; }
+.field { display: grid; gap: 8px; }
+.field > label, .field > .lbl { font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+.field .hint { font-weight: 500; color: var(--muted); font-size: 12px; }
+.input {
+  width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 13px 14px; font-size: 16px;
+  outline: none; transition: border-color .15s;
+}
+.input:focus { border-color: var(--overprint); }
+textarea.input { min-height: 88px; resize: vertical; }
+.catgrid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.catopt { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 10px 4px; display: grid; justify-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.catopt[aria-pressed="true"] { border-color: var(--overprint); color: var(--overprint); background: var(--overprint-soft); }
+.stepper { display: grid; grid-template-columns: 50px 1fr 50px; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.stepper button { height: 52px; border: 0; background: var(--sunk); font-size: 22px; font-weight: 700; }
+.stepper output { text-align: center; font: 800 24px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.objective { display: flex; gap: 10px; align-items: center; }
+.objective .n { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--overprint); color: var(--overprint); display: grid; place-items: center; font: 700 11px/1 var(--f-mono); }
+.preview { padding: 14px; border-radius: 14px; background: var(--overprint-soft); display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.preview b { font: 800 20px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.preview span { font-size: 12px; color: var(--muted); font-weight: 600; display: block; margin-top: 3px; }
+.err { color: #C0392B; font-size: 13px; font-weight: 600; margin: 0; }
+
+/* ---------- Profile ---------- */
+.me { display: flex; gap: 14px; align-items: center; }
+.me .avatar { width: 64px; height: 64px; font-size: 22px; background: var(--overprint); color: var(--on-accent); }
+.me-name { border: 0; background: transparent; font: 850 24px/1.1 var(--f-display); font-stretch: 108%; padding: 0; width: 100%; outline: none; }
+.me-name:focus { border-bottom: 2px solid var(--overprint); }
+.me .rank { color: var(--muted); font-size: 14px; font-weight: 600; }
+.xpbar { display: grid; gap: 8px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.xpbar .row { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); font-weight: 600; }
+.xpbar .row b { color: var(--ink); }
+.xpbar .progress { height: 10px; border-radius: 5px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.stat { padding: 14px 12px; border-radius: 14px; background: var(--sunk); display: grid; gap: 4px; }
+.stat b { font: 800 22px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.punchcard { padding: 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); display: grid; gap: 12px; }
+.punchcard .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.punchcard h3 { font: 800 16px/1.2 var(--f-display); }
+.punches { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 6px; }
+.punch { aspect-ratio: 1; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; display: grid; place-items: center; position: relative; font: 700 10px/1 var(--f-mono); color: var(--muted); }
+.punch.hit { color: var(--overprint); border-color: var(--overprint); }
+.punch.hit svg { position: absolute; inset: 18%; width: 64%; height: 64%; }
+.punch .lbl { position: absolute; top: 3px; left: 4px; font-size: 8px; }
+.badges { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.badge-c { padding: 14px 8px; border-radius: 14px; border: 1px solid var(--line); display: grid; justify-items: center; gap: 6px; text-align: center; background: var(--surface); }
+.badge-c .seal { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); color: var(--muted); }
+.badge-c.got .seal { background: var(--flag); color: #fff; }
+.badge-c b { font-size: 12.5px; line-height: 1.2; }
+.badge-c span { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.settings { display: grid; gap: 10px; padding: 16px; border-radius: 16px; background: var(--sunk); }
+.settings p { margin: 0; color: var(--muted); font-size: 13px; }
+.settings .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Turn-in overlay ---------- */
+.done-overlay {
+  position: fixed; inset: 0; z-index: 60; background: var(--paper); display: grid; place-items: center;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) var(--gutter-r) calc(24px + env(safe-area-inset-bottom, 0px)) var(--gutter-l);
+  opacity: 0; transition: opacity .25s ease;
+}
+.done-overlay.show { opacity: 1; }
+.done-inner { width: 100%; max-width: 380px; display: grid; gap: 20px; justify-items: center; text-align: center; }
+.stamp {
+  width: 132px; height: 132px; border-radius: 50%; border: 5px solid var(--overprint); color: var(--overprint);
+  display: grid; place-items: center; position: relative; transform: scale(1.6) rotate(-14deg); opacity: 0;
+  transition: transform .35s cubic-bezier(.3,1.6,.5,1), opacity .2s;
+}
+.done-overlay.show .stamp { transform: scale(1) rotate(-8deg); opacity: 1; }
+.stamp::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; border: 2px solid var(--overprint); }
+.stamp b { font: 900 34px/1 var(--f-mono); }
+.done-inner h2 { font: 900 34px/1 var(--f-display); font-stretch: 120%; letter-spacing: -.02em; }
+.done-inner p { margin: 0; color: var(--muted); }
+.gains { display: flex; gap: 10px; }
+.gains div { padding: 12px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+.gains b { display: block; font: 850 24px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.gains span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.gains .xp b { color: var(--overprint); }
+.levelup { padding: 10px 14px; border-radius: 12px; background: var(--flag); color: #fff; font-weight: 700; }
+.done-inner .xpbar { width: 100%; text-align: left; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; left: 50%; z-index: 70; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px);
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: var(--paper); padding: 11px 16px; border-radius: 12px; font-weight: 600; font-size: 14px;
+  transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Install hint ---------- */
+.install {
+  display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--ink); color: var(--paper);
+}
+.install p { margin: 0; flex: 1; font-size: 13px; min-width: 0; }
+.install b { display: block; font-size: 14px; }
+.install button { border: 0; background: transparent; color: inherit; opacity: .7; padding: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+@media (min-width: 420px) { #map { height: 260px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="8" fill="var(--overprint)"/>
+        <path d="M8 8h16v16z" fill="var(--flag)"/>
+        <path d="M8 8h16L8 24z" fill="#fff"/>
+      </svg>
+      <div style="min-width:0">
+        <div class="brand-name">Sidequest</div>
+        <div class="brand-sub"><svg class="i" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg><span id="whereLabel">Near you · 3 km</span></div>
+      </div>
+    </div>
+    <button class="lvl-pill" id="lvlPill" aria-label="Your level and earnings">
+      <span class="lvl-ring">
+        <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="var(--sunk)" stroke-width="4"/><circle id="lvlArc" cx="18" cy="18" r="15" fill="none" stroke="var(--overprint)" stroke-width="4" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="94.25"/></svg>
+        <span id="lvlNum">1</span>
+      </span>
+      <span class="cash" id="cashPill">$0<small>earned</small></span>
+    </button>
+  </header>
+
+  <!-- EXPLORE -->
+  <main class="screen" id="explore" aria-label="Explore quests">
+    <div class="install" id="installHint" hidden>
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+      <p><b>Put Sidequest on your home screen</b><span id="installHow">Tap Share, then Add to Home Screen.</span></p>
+      <button id="installBtn" class="btn sm" hidden>Install</button>
+      <button id="installClose" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+
+    <div class="mapcard">
+      <canvas id="map" aria-label="Map of quests near you. Tap a circle to open a quest."></canvas>
+      <div class="map-count" id="mapCount">9 quests nearby</div>
+      <div class="map-legend">
+        <span><svg viewBox="0 0 12 12"><path d="M6 1.5L11 10.5H1z" fill="none" stroke="var(--overprint)" stroke-width="1.6"/></svg>You</span>
+        <span><svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--overprint)" stroke-width="1.6"/></svg>Quest</span>
+        <span><svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="5" fill="none" stroke="var(--overprint)" stroke-width="1.2"/><circle cx="6" cy="6" r="2.8" fill="none" stroke="var(--overprint)" stroke-width="1.2"/></svg>Accepted</span>
+      </div>
+      <div class="map-scale"><span id="scaleLbl">500 m</span><i></i></div>
+    </div>
+
+    <div class="chips" id="cats" role="toolbar" aria-label="Filter by category"></div>
+
+    <div class="listhead">
+      <h2 id="listTitle">Open quests</h2>
+      <div class="sort" role="group" aria-label="Sort">
+        <button data-sort="near" aria-pressed="true">Nearest</button>
+        <button data-sort="pay" aria-pressed="false">Top pay</button>
+        <button data-sort="quick" aria-pressed="false">Quick</button>
+      </div>
+    </div>
+    <div class="quests" id="questList"></div>
+  </main>
+
+  <!-- LOG -->
+  <main class="screen" id="log" hidden aria-label="Quest log">
+    <div class="screen-head">
+      <span class="eyebrow">Quest log</span>
+      <h1 class="screen-title">Your quests</h1>
+    </div>
+    <div class="seg" role="group" aria-label="Quest log sections">
+      <button data-seg="active" aria-pressed="true">Active<small id="cActive"></small></button>
+      <button data-seg="posted" aria-pressed="false">Posted<small id="cPosted"></small></button>
+      <button data-seg="done" aria-pressed="false">Done<small id="cDone"></small></button>
+    </div>
+    <div class="quests" id="logList"></div>
+  </main>
+
+  <!-- POST -->
+  <main class="screen" id="post" hidden aria-label="Post a quest">
+    <div class="screen-head">
+      <span class="eyebrow">New quest</span>
+      <h1 class="screen-title">Need a hand?</h1>
+      <p>Describe the job, set a reward, and neighbors nearby will see it on their map.</p>
+    </div>
+    <form class="form" id="postForm" novalidate>
+      <div class="field">
+        <label for="pTitle">What needs doing? <span class="hint" id="titleCount">0/60</span></label>
+        <input class="input" id="pTitle" maxlength="60" placeholder="Help me move a dresser" autocomplete="off">
+      </div>
+      <div class="field">
+        <span class="lbl">Category</span>
+        <div class="catgrid" id="pCats"></div>
+      </div>
+      <div class="two">
+        <div class="field">
+          <span class="lbl">Reward</span>
+          <div class="stepper">
+            <button type="button" id="rMinus" aria-label="Lower reward">−</button>
+            <output id="pReward">$25</output>
+            <button type="button" id="rPlus" aria-label="Raise reward">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pMins">Takes about</label>
+          <select class="input" id="pMins">
+            <option value="20">20 min</option>
+            <option value="30">30 min</option>
+            <option value="45" selected>45 min</option>
+            <option value="60">1 hour</option>
+            <option value="90">1.5 hours</option>
+            <option value="120">2 hours</option>
+            <option value="180">3 hours</option>
+          </select>
+        </div>
+      </div>
+      <div class="two">
+        <div class="field">
+          <label for="pWhen">When</label>
+          <select class="input" id="pWhen">
+            <option>Today · ASAP</option>
+            <option>Today · evening</option>
+            <option selected>Tomorrow · flexible</option>
+            <option>This weekend</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pArea">Where</label>
+          <input class="input" id="pArea" maxlength="30" placeholder="Linden Ave" autocomplete="off">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pDesc">Details <span class="hint">Optional</span></label>
+        <textarea class="input" id="pDesc" maxlength="280" placeholder="Anything they should know: stairs, tools, parking, pets."></textarea>
+      </div>
+      <div class="field">
+        <span class="lbl">Steps <span class="hint">At least one</span></span>
+        <div class="objective"><span class="n">1</span><input class="input" id="pS1" maxlength="60" placeholder="Meet me at the front door" autocomplete="off"></div>
+        <div class="objective"><span class="n">2</span><input class="input" id="pS2" maxlength="60" placeholder="Carry the dresser to the van" autocomplete="off"></div>
+        <div class="objective"><span class="n">3</span><input class="input" id="pS3" maxlength="60" placeholder="Optional" autocomplete="off"></div>
+      </div>
+      <div class="preview">
+        <div><b id="pvReward">$25</b><span>You pay on completion</span></div>
+        <div style="text-align:right"><b id="pvXp" style="color:var(--overprint)">+120 XP</b><span>Helper earns</span></div>
+      </div>
+      <p class="err" id="postErr" hidden></p>
+      <button class="btn block" type="submit">Post quest</button>
+    </form>
+  </main>
+
+  <!-- PROFILE -->
+  <main class="screen" id="profile" hidden aria-label="Profile">
+    <div class="me">
+      <div class="avatar" id="meAvatar">A</div>
+      <div style="min-width:0;flex:1">
+        <label class="eyebrow" for="meName">Your name</label>
+        <input class="me-name" id="meName" maxlength="24" autocomplete="off">
+        <div class="rank" id="meRank">Level 1 · Wanderer</div>
+      </div>
+    </div>
+    <div class="xpbar">
+      <div class="row"><span>Level <b id="xpLvl">1</b></span><span><b id="xpNow">0</b> / <span id="xpNeed">300</span> XP</span></div>
+      <div class="progress"><i id="xpFill" style="width:0%"></i></div>
+      <div class="row"><span id="xpNext">300 XP to Pathfinder</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="stEarned">$0</b><span>Earned</span></div>
+      <div class="stat"><b id="stDone">0</b><span>Quests done</span></div>
+      <div class="stat"><b id="stPosted">0</b><span>Posted</span></div>
+    </div>
+    <div class="punchcard">
+      <div class="head"><h3>Punch card</h3><span class="eyebrow" id="punchCount">0 / 12</span></div>
+      <div class="punches" id="punches"></div>
+      <span style="font-size:12.5px;color:var(--muted)">Every quest you turn in punches its control code. Fill the card for a 50 XP bonus.</span>
+    </div>
+    <div class="d-section">
+      <h3>Badges</h3>
+      <div class="badges" id="badges"></div>
+    </div>
+    <div class="settings">
+      <b>Sample quests</b>
+      <p>The quests on the map are examples so you can try everything. Your progress is saved on this phone.</p>
+      <div class="row" id="resetRow">
+        <button class="btn sm line" id="resetBtn" type="button">Start over</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="tabbar">
+  <nav aria-label="Main">
+    <button class="tab" data-tab="explore" aria-current="page">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Explore
+    </button>
+    <button class="tab" data-tab="log">
+      <svg class="i" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6M9 18h3"/></svg>Log<span class="badge" id="logBadge" hidden>0</span>
+    </button>
+    <button class="tab tab-post" data-tab="post" aria-label="Post a quest">
+      <span class="plus"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+    </button>
+    <button class="tab" data-tab="profile">
+      <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Profile
+    </button>
+    <button class="tab" data-tab="earn" aria-label="Earnings">
+      <svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/></svg>Wallet
+    </button>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim" hidden></div>
+<section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-grab"><i></i></div>
+  <button class="sheet-close" id="sheetClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <div class="sheet-body" id="sheetBody"></div>
+  <div class="sheet-foot" id="sheetFoot"></div>
+</section>
+
+<div class="done-overlay" id="doneOverlay" hidden role="dialog" aria-modal="true" aria-label="Quest complete"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- Icons ---------- */
+const I = {
+  errands: '<path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  moving: '<path d="M3 7.5l9-4 9 4v9l-9 4-9-4z"/><path d="M3 7.5l9 4 9-4M12 11.5v9"/>',
+  pets: '<circle cx="7" cy="10" r="1.8"/><circle cx="10.5" cy="6.5" r="1.8"/><circle cx="14.5" cy="6.5" r="1.8"/><circle cx="18" cy="10" r="1.8"/><path d="M8.5 17c0-2.5 1.6-4.5 4-4.5s4 2 4 4.5c0 1.6-1.4 2.2-2.6 1.8-.9-.3-1.9-.3-2.8 0-1.2.4-2.6-.2-2.6-1.8z"/>',
+  yard: '<path d="M5 19c0-8 6-14 15-14 0 9-6 14-14 14"/><path d="M5 19l8-8"/>',
+  tech: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>',
+  events: '<path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M14 7v10" stroke-dasharray="2 2"/>',
+  cleaning: '<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="M19 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+  all: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  walk: '<circle cx="13" cy="4.5" r="1.8"/><path d="M10 21l2-6-2.5-2.5L11 8l3 3 3 1M9.5 12.5L7 14"/><path d="M12 15l2.5 6"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+  cal: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  flag: '<path d="M6 21V4M6 4h12l-3 4.5 3 4.5H6"/>',
+  bolt: '<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 7.5 3c0 5.4-7.5 10-7.5 10z"/>',
+  crown: '<path d="M4 18h16M5 15L4 7l5 4 3-6 3 6 5-4-1 8z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/>',
+  cash: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 15h2"/>'
+};
+const icon = (k, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[k] || ''}</svg>`;
+
+const CATS = {
+  errands: 'Errands', moving: 'Moving', pets: 'Pets', yard: 'Yard',
+  tech: 'Tech help', events: 'Events', cleaning: 'Cleaning'
+};
+const RANKS = ['Wanderer', 'Pathfinder', 'Trailblazer', 'Wayfarer', 'Ranger', 'Cartographer', 'Legend'];
+const XP_PER_LEVEL = 300;
+const START = { x: 0.5, y: 0.6 };
+const KM_PER_UNIT = 5;
+
+/* Sample quests. x/y are positions on the local map (0–1). */
+const SEED = [
+  { code: 31, title: 'Carry a couch up three flights', cat: 'moving', reward: 45, mins: 60, when: 'Today · 5–7 pm', area: 'Linden Ave', diff: 3, x: .27, y: .38,
+    poster: { name: 'Marisol R.', rating: 4.9, jobs: 23 }, desc: 'New couch is in the lobby. Building has no elevator. One other helper is already coming, so it is a two-person carry.',
+    steps: ['Meet Marisol at the lobby door', 'Carry the couch to unit 3B', 'Help set it in the living room'] },
+  { code: 32, title: 'Walk Biscuit, a very good beagle', cat: 'pets', reward: 18, mins: 30, when: 'Today · 6:30 pm', area: 'Riverside Park', diff: 1, x: .63, y: .47,
+    poster: { name: 'Dev P.', rating: 5.0, jobs: 41 }, desc: 'Biscuit pulls a little at first, then settles. Leash and bags are in the lockbox by the door, code sent when you accept.',
+    steps: ['Get the leash from the lockbox', 'Walk the river loop, about 30 min', 'Refill the water bowl'] },
+  { code: 33, title: 'Grocery run for a neighbor', cat: 'errands', reward: 15, mins: 40, when: 'Tomorrow · before noon', area: 'Old Town', diff: 1, x: .44, y: .27,
+    poster: { name: 'Helen K.', rating: 4.8, jobs: 12 }, desc: 'About 12 items, nothing heavy. Helen pays you back for the groceries plus the reward.',
+    steps: ['Get the list from Helen', 'Shop at the Market Sq grocer', 'Drop off and send the receipt'] },
+  { code: 34, title: 'Set up a new Wi‑Fi router', cat: 'tech', reward: 30, mins: 45, when: 'Tomorrow · 10 am–2 pm', area: 'Hillcrest', diff: 2, x: .78, y: .24,
+    poster: { name: 'Sam O.', rating: 4.7, jobs: 8 }, desc: 'Router is still in the box. The TV, a printer and two laptops need to reconnect afterward.',
+    steps: ['Swap the old router for the new one', 'Reconnect the TV and printer', 'Write down the new password'] },
+  { code: 35, title: 'Rake leaves in the front yard', cat: 'yard', reward: 25, mins: 90, when: 'Sat · morning', area: 'Maple Ct', diff: 2, x: .19, y: .7,
+    poster: { name: 'The Okafors', rating: 4.9, jobs: 30 }, desc: 'Rakes and yard bags are on the porch. Back yard is not included.',
+    steps: ['Rake the front lawn', 'Bag the leaves', 'Line the bags up at the curb'] },
+  { code: 36, title: 'Hand out flyers at the farmers market', cat: 'events', reward: 40, mins: 120, when: 'Sat · 9–11 am', area: 'Market Sq', diff: 2, x: .56, y: .82,
+    poster: { name: 'Green Fork Co-op', rating: 4.6, jobs: 57 }, desc: 'Stand by the north entrance and hand out flyers for the co-op. Free coffee from the stall next door.',
+    steps: ['Pick up flyers at the co-op stall', 'Hand out flyers for two hours', 'Return leftovers to the stall'] },
+  { code: 37, title: 'Deep clean a studio after move-out', cat: 'cleaning', reward: 60, mins: 150, when: 'Sun · any time', area: 'Canal St', diff: 3, x: .84, y: .63,
+    poster: { name: 'Priya N.', rating: 4.8, jobs: 15 }, desc: 'Empty studio, about 400 sq ft. All supplies are under the sink. Needs to pass the landlord walk-through on Monday.',
+    steps: ['Kitchen, including inside the fridge', 'Bathroom', 'Floors and windows'] },
+  { code: 38, title: 'Return a package at the post office', cat: 'errands', reward: 10, mins: 20, when: 'Today · by 6 pm', area: 'Linden Ave', diff: 1, x: .39, y: .54,
+    poster: { name: 'Marco T.', rating: 4.9, jobs: 19 }, desc: 'The box is sealed and labeled. It just needs to get dropped off before the counter closes.',
+    steps: ['Pick up the box from Marco', 'Drop it at the post office counter', 'Send a photo of the receipt'] },
+  { code: 39, title: 'Assemble a flat-pack bookshelf', cat: 'moving', reward: 35, mins: 75, when: 'Tomorrow · evening', area: 'Hillcrest', diff: 2, x: .68, y: .34,
+    poster: { name: 'Jonah W.', rating: 4.7, jobs: 6 }, desc: 'Five-shelf unit, all parts and the hex key are there. Needs to be anchored to the wall too.',
+    steps: ['Unpack and sort the parts', 'Assemble the shelf', 'Anchor it to the wall'] }
+];
+
+/* ---------- State ---------- */
+const KEY = 'sidequest.v1';
+const fresh = () => ({
+  name: 'Adventurer', xp: 0, earned: 0, filter: 'all', sort: 'near', seg: 'active', installDismissed: false,
+  nextCode: 40,
+  quests: SEED.map(q => ({ ...q, status: 'open', progress: q.steps.map(() => false), mine: false }))
+});
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || fresh(); } catch (e) { S = fresh(); }
+if (!S.quests || !Array.isArray(S.quests)) S = fresh();
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const xpFor = q => Math.round(q.reward * 2 + q.mins * 0.8 + q.diff * 10);
+const km = q => Math.hypot(q.x - START.x, q.y - START.y) * KM_PER_UNIT;
+const fmtKm = d => d < 1 ? `${Math.round(d * 1000 / 50) * 50} m` : `${d.toFixed(1)} km`;
+const walkMin = d => Math.max(2, Math.round(d / 4.8 * 60));
+const fmtMins = m => m < 60 ? `${m} min` : (m % 60 ? `${Math.floor(m / 60)} h ${m % 60}` : `${m / 60} h`);
+const level = xp => Math.floor(xp / XP_PER_LEVEL) + 1;
+const rank = lv => RANKS[Math.min(lv - 1, RANKS.length - 1)];
+const initials = n => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+const byId = id => S.quests.find(q => q.code === id);
+const diffBars = d => `<span class="diff" aria-label="Effort ${d} of 3">${[1, 2, 3].map(i => `<i class="${i <= d ? 'on' : ''}"></i>`).join('')}</span>`;
+
+let toastT;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ---------- Header ---------- */
+function renderHeader() {
+  const lv = level(S.xp), into = S.xp % XP_PER_LEVEL;
+  $('#lvlNum').textContent = lv;
+  $('#lvlArc').setAttribute('stroke-dashoffset', (94.25 * (1 - into / XP_PER_LEVEL)).toFixed(2));
+  $('#cashPill').innerHTML = `$${S.earned}<small>earned</small>`;
+  const active = S.quests.filter(q => q.status === 'active').length;
+  const b = $('#logBadge'); b.hidden = !active; b.textContent = active;
+}
+
+/* ---------- Explore ---------- */
+function renderCats() {
+  const counts = {};
+  S.quests.filter(q => q.status === 'open' && !q.mine).forEach(q => counts[q.cat] = (counts[q.cat] || 0) + 1);
+  const keys = ['all', ...Object.keys(CATS).filter(k => counts[k])];
+  if (!keys.includes(S.filter)) S.filter = 'all';
+  $('#cats').innerHTML = keys.map(k => `<button class="chip" data-cat="${k}" aria-pressed="${S.filter === k}">${icon(k)}${k === 'all' ? 'All' : CATS[k]}</button>`).join('');
+}
+
+function visibleQuests() {
+  let list = S.quests.filter(q => (q.status === 'open' && !q.mine) && (S.filter === 'all' || q.cat === S.filter));
+  const sorters = { near: (a, b) => km(a) - km(b), pay: (a, b) => b.reward - a.reward, quick: (a, b) => a.mins - b.mins };
+  return list.sort(sorters[S.sort]);
+}
+
+function qcard(q, extra = '') {
+  const d = km(q);
+  const cls = q.status === 'active' ? 'active' : q.status === 'done' ? 'done' : q.mine ? 'mine' : '';
+  const hot = q.reward / q.mins >= 0.55 ? '<span class="tag hot">Good pay</span>' : '';
+  const soon = /^Today/.test(q.when) ? '<span class="tag">Today</span>' : '';
+  return `<button class="qcard" data-open="${q.code}">
+    <span class="ctrl ${cls}">${icon(q.status === 'done' ? 'check' : q.cat)}<b>${q.code}</b></span>
+    <span class="qbody">
+      <span class="qtitle">${esc(q.title)}</span>
+      <span class="qmeta"><span>${icon('pin')}${esc(q.area)}${q.mine ? '' : ` · ${fmtKm(d)}`}</span><span>${icon('clock')}${fmtMins(q.mins)}</span></span>
+      <span class="qtags">${diffBars(q.diff)}${soon}${hot}${extra}</span>
+    </span>
+    <span class="qreward"><span class="usd">$${q.reward}</span><span class="xp">+${xpFor(q)} XP</span></span>
+  </button>`;
+}
+
+function renderExplore() {
+  renderCats();
+  const list = visibleQuests();
+  $('#listTitle').textContent = S.filter === 'all' ? 'Open quests' : CATS[S.filter];
+  $$('.sort button').forEach(b => b.setAttribute('aria-pressed', b.dataset.sort === S.sort));
+  $('#questList').innerHTML = list.length ? list.map(q => qcard(q)).join('') :
+    `<div class="empty">${icon('flag')}<h3>You cleared the map</h3><p>Every quest nearby is taken. Post one of your own, or check back later today.</p><button class="btn sm" data-tab-go="post">Post a quest</button></div>`;
+  const open = S.quests.filter(q => q.status === 'open' && !q.mine).length;
+  $('#mapCount').textContent = `${open} quest${open === 1 ? '' : 's'} nearby`;
+  drawMap();
+}
+
+/* ---------- Map (orienteering style) ---------- */
+const canvas = $('#map');
+let mapHits = [];
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function blob(ctx, cx, cy, r, rand, wob) {
+  const k1 = 2 + Math.floor(rand() * 3), k2 = 4 + Math.floor(rand() * 3), p1 = rand() * 6.28, p2 = rand() * 6.28;
+  ctx.beginPath();
+  for (let i = 0; i <= 72; i++) {
+    const t = i / 72 * Math.PI * 2;
+    const rr = r * (1 + wob * Math.sin(k1 * t + p1) + wob * .5 * Math.sin(k2 * t + p2));
+    const px = cx + Math.cos(t) * rr * 1.25, py = cy + Math.sin(t) * rr;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function drawMap() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const C = { paper: cssVar('--surface'), contour: cssVar('--contour'), over: cssVar('--overprint'), open: cssVar('--open'), veg: cssVar('--veg'), water: cssVar('--water'), muted: cssVar('--muted') };
+  ctx.fillStyle = C.paper; ctx.fillRect(0, 0, w, h);
+  $('#scaleLbl').textContent = fmtKm(48 / w * KM_PER_UNIT);
+  const rand = rng(7);
+
+  // open land (yellow) and vegetation (green)
+  ctx.globalAlpha = .22; ctx.fillStyle = C.open;
+  blob(ctx, w * .14, h * .2, h * .2, rand, .15); ctx.fill();
+  blob(ctx, w * .62, h * .92, h * .18, rand, .2); ctx.fill();
+  ctx.globalAlpha = .8; ctx.fillStyle = C.veg;
+  blob(ctx, w * .9, h * .15, h * .22, rand, .2); ctx.fill();
+  blob(ctx, w * .08, h * .85, h * .2, rand, .2); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // contours, every 5th is an index contour
+  ctx.strokeStyle = C.contour; ctx.globalAlpha = .55;
+  [[.32, .42, 6], [.74, .5, 5], [.12, .56, 4]].forEach(([hx, hy, n]) => {
+    const r2 = rng(Math.round(hx * 1000 + hy * 100));
+    for (let i = 1; i <= n; i++) {
+      ctx.lineWidth = i === 5 ? 1.6 : .8;
+      blob(ctx, w * hx, h * hy, i * h * .065, r2, .12); ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // stream
+  ctx.strokeStyle = C.water; ctx.lineWidth = 2; ctx.globalAlpha = .7;
+  ctx.beginPath(); ctx.moveTo(w * .52, -4);
+  ctx.bezierCurveTo(w * .62, h * .25, w * .46, h * .45, w * .58, h * .62);
+  ctx.bezierCurveTo(w * .66, h * .76, w * .78, h * .8, w + 4, h * .86); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // paths (dashed black)
+  ctx.strokeStyle = C.muted; ctx.lineWidth = 1.1; ctx.setLineDash([5, 3]); ctx.globalAlpha = .7;
+  ctx.beginPath(); ctx.moveTo(0, h * .62); ctx.quadraticCurveTo(w * .4, h * .5, w, h * .4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * .3, h); ctx.quadraticCurveTo(w * .36, h * .5, w * .22, 0); ctx.stroke();
+  ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+  // course: start triangle, legs, controls
+  const pts = S.quests.filter(q => (q.status === 'open' && !q.mine && (S.filter === 'all' || q.cat === S.filter)) || q.status === 'active');
+  const P = q => [q.x * w, q.y * h];
+  const sx = START.x * w, sy = START.y * h, R = 11;
+  // route: nearest-neighbour from start through active first
+  const order = [], left = pts.slice().sort((a, b) => (b.status === 'active') - (a.status === 'active'));
+  let cur = [sx, sy];
+  const act = left.filter(q => q.status === 'active');
+  const rest = left.filter(q => q.status !== 'active');
+  [act, rest].forEach(group => {
+    while (group.length) {
+      let bi = 0, bd = Infinity;
+      group.forEach((q, i) => { const [x, y] = P(q); const d = Math.hypot(x - cur[0], y - cur[1]); if (d < bd) { bd = d; bi = i; } });
+      const q = group.splice(bi, 1)[0]; order.push(q); cur = P(q);
+    }
+  });
+  ctx.strokeStyle = C.over; ctx.fillStyle = C.over; ctx.lineWidth = 1.6; ctx.globalAlpha = .9;
+  let prev = [sx, sy], prevR = 9;
+  order.forEach(q => {
+    const [x, y] = P(q), dx = x - prev[0], dy = y - prev[1], d = Math.hypot(dx, dy);
+    if (d > prevR + R + 2) {
+      ctx.beginPath();
+      ctx.moveTo(prev[0] + dx / d * (prevR + 2), prev[1] + dy / d * (prevR + 2));
+      ctx.lineTo(x - dx / d * (R + 2), y - dy / d * (R + 2)); ctx.stroke();
+    }
+    prev = [x, y]; prevR = R;
+  });
+  ctx.globalAlpha = 1;
+  // start triangle
+  ctx.lineWidth = 2.2; ctx.beginPath();
+  ctx.moveTo(sx, sy - 10); ctx.lineTo(sx + 9, sy + 6); ctx.lineTo(sx - 9, sy + 6); ctx.closePath(); ctx.stroke();
+  // controls
+  mapHits = [];
+  ctx.font = `700 11px ${cssVar('--f-mono') || 'monospace'}`; ctx.textBaseline = 'middle';
+  order.forEach(q => {
+    const [x, y] = P(q);
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+    if (q.status === 'active') { ctx.beginPath(); ctx.arc(x, y, R - 4.5, 0, Math.PI * 2); ctx.stroke(); }
+    const label = String(q.code), lx = x + R + 3, ly = y - R + 1;
+    ctx.lineWidth = 3; ctx.strokeStyle = C.paper; ctx.strokeText(label, lx, ly);
+    ctx.fillStyle = C.over; ctx.fillText(label, lx, ly); ctx.strokeStyle = C.over;
+    mapHits.push({ x, y, code: q.code });
+  });
+}
+
+canvas.addEventListener('click', e => {
+  const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  let best = null, bd = 26;
+  mapHits.forEach(h => { const d = Math.hypot(h.x - x, h.y - y); if (d < bd) { bd = d; best = h; } });
+  if (best) openSheet(best.code);
+});
+
+/* ---------- Sheet ---------- */
+let sheetCode = null, lastFocus = null;
+function openSheet(code) {
+  const q = byId(code); if (!q) return;
+  sheetCode = code; lastFocus = document.activeElement;
+  renderSheet();
+  const sc = $('#scrim'), sh = $('#sheet');
+  sc.hidden = false; sh.hidden = false;
+  requestAnimationFrame(() => { sc.classList.add('show'); sh.classList.add('show'); });
+  $('#sheetBody').scrollTop = 0;
+  setTimeout(() => $('#sheetClose').focus(), 50);
+}
+function closeSheet() {
+  const sc = $('#scrim'), sh = $('#sheet');
+  sc.classList.remove('show'); sh.classList.remove('show');
+  setTimeout(() => { sc.hidden = true; sh.hidden = true; }, 280);
+  sheetCode = null;
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function renderSheet() {
+  const q = byId(sheetCode); if (!q) return;
+  const d = km(q);
+  const isActive = q.status === 'active';
+  const stepsHtml = q.steps.map((s, i) => isActive
+    ? `<li class="step"><label><input type="checkbox" data-step="${i}" ${q.progress[i] ? 'checked' : ''}><span class="n">${i + 1}</span><span>${esc(s)}</span></label></li>`
+    : `<li class="step"><span class="n">${i + 1}</span><span style="padding-top:3px">${esc(s)}</span></li>`).join('');
+  const posterName = q.mine ? S.name : q.poster.name;
+  $('#sheetBody').innerHTML = `
+    <div class="d-head">
+      <span class="eyebrow">Control ${q.code} · ${CATS[q.cat]}${q.mine ? ' · Posted by you' : ''}</span>
+      <h2 class="d-title" id="sheetTitle">${esc(q.title)}</h2>
+    </div>
+    <div class="d-stats">
+      <div class="d-stat cash"><b>$${q.reward}</b><span>Reward</span></div>
+      <div class="d-stat xp"><b>+${xpFor(q)}</b><span>XP</span></div>
+      <div class="d-stat"><b>${fmtMins(q.mins)}</b><span>Time</span></div>
+      <div class="d-stat"><b>${q.mine ? '—' : fmtKm(d)}</b><span>${q.mine ? 'Your spot' : walkMin(d) + ' min walk'}</span></div>
+    </div>
+    <div class="when">${icon('cal')}<div><b>${esc(q.when)}</b><span>${icon('pin', 'i').replace('class="i"', 'class="i" style="width:12px;height:12px;vertical-align:-1px"')} ${esc(q.area)}</span></div></div>
+    <div class="d-section">
+      <h3>${isActive ? 'Your steps' : 'Steps'}</h3>
+      <ol class="steps">${stepsHtml}</ol>
+      ${isActive ? '<p>Tick each step as you finish it. Turn in the quest when all are done.</p>' : ''}
+    </div>
+    ${q.desc ? `<div class="d-section"><h3>Details</h3><p>${esc(q.desc)}</p></div>` : ''}
+    <div class="poster">
+      <span class="avatar">${initials(posterName)}</span>
+      <span class="who"><b>${esc(posterName)}</b><span>${q.mine ? 'This is your quest' : `${icon('star', 'i').replace('class="i"', 'class="i" style="width:13px;height:13px;vertical-align:-2px;color:var(--open)"')} ${q.poster.rating.toFixed(1)} · ${q.poster.jobs} quests posted`}</span></span>
+      <span>${diffBars(q.diff)}</span>
+    </div>`;
+  const foot = $('#sheetFoot');
+  if (q.mine) {
+    foot.innerHTML = q.status === 'posted'
+      ? `<button class="btn line" data-act="close">Close</button><button class="btn ghost" data-act="cancel">Take it down</button>`
+      : `<button class="btn line block" data-act="close">Close</button>`;
+  } else if (q.status === 'open') {
+    foot.innerHTML = `<button class="btn block" data-act="accept">${icon('flag')}Accept quest · $${q.reward}</button>`;
+  } else if (isActive) {
+    const all = q.progress.every(Boolean);
+    foot.innerHTML = `<button class="btn line" data-act="drop" style="flex:0 0 auto">Drop</button><button class="btn" data-act="turnin" ${all ? '' : 'disabled'}>${icon('check')}Turn in</button>`;
+  } else {
+    foot.innerHTML = `<button class="btn line block" data-act="close">Completed · $${q.reward} earned</button>`;
+  }
+}
+
+$('#sheetBody').addEventListener('change', e => {
+  const i = e.target.dataset.step; if (i == null) return;
+  const q = byId(sheetCode); q.progress[+i] = e.target.checked; save();
+  const btn = $('#sheetFoot [data-act="turnin"]'); if (btn) btn.disabled = !q.progress.every(Boolean);
+  renderLog();
+});
+$('#sheetFoot').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const q = byId(sheetCode), act = b.dataset.act;
+  if (act === 'close') return closeSheet();
+  if (act === 'accept') {
+    q.status = 'active'; save(); renderAll(); renderSheet();
+    toast(`Quest accepted. ${q.poster.name.split(' ')[0]} has been told you're coming.`);
+  }
+  if (act === 'drop') {
+    q.status = 'open'; q.progress = q.steps.map(() => false); save(); closeSheet(); renderAll();
+    toast('Quest dropped. It is back on the map.');
+  }
+  if (act === 'cancel') {
+    S.quests = S.quests.filter(x => x !== q); save(); closeSheet(); renderAll(); toast('Your quest was taken down.');
+  }
+  if (act === 'turnin') { closeSheet(); turnIn(q); }
+});
+$('#sheetClose').addEventListener('click', closeSheet);
+$('#scrim').addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetCode != null) closeSheet(); });
+
+// swipe the sheet down to close
+(() => {
+  let y0 = null, dy = 0;
+  const sh = $('#sheet');
+  sh.addEventListener('touchstart', e => {
+    if (e.target.closest('.sheet-body') && $('#sheetBody').scrollTop > 0) return;
+    y0 = e.touches[0].clientY; dy = 0; sh.style.transition = 'none';
+  }, { passive: true });
+  sh.addEventListener('touchmove', e => {
+    if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0);
+    sh.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  sh.addEventListener('touchend', () => {
+    if (y0 == null) return; sh.style.transition = ''; sh.style.transform = '';
+    if (dy > 110) closeSheet(); y0 = null;
+  });
+})();
+
+/* ---------- Turn in ---------- */
+function turnIn(q) {
+  const gained = xpFor(q), lvBefore = level(S.xp);
+  $('#toast').classList.remove('show');
+  q.status = 'done'; q.doneAt = Date.now();
+  S.xp += gained; S.earned += q.reward;
+  const doneCount = S.quests.filter(x => x.status === 'done').length;
+  let bonus = '';
+  if (doneCount === 12) { S.xp += 50; bonus = '<p>Punch card full: +50 XP bonus</p>'; }
+  save();
+  const lv = level(S.xp), into = S.xp % XP_PER_LEVEL;
+  const ov = $('#doneOverlay');
+  ov.innerHTML = `<div class="done-inner">
+    <div class="stamp"><b>${q.code}</b></div>
+    <div style="display:grid;gap:8px"><h2>Quest complete</h2><p>${esc(q.title)}</p></div>
+    <div class="gains"><div><b>+$${q.reward}</b><span>Paid to your wallet</span></div><div class="xp"><b>+${gained}</b><span>XP</span></div></div>
+    ${lv > lvBefore ? `<div class="levelup">Level ${lv} reached · You're a ${rank(lv)} now</div>` : ''}
+    ${bonus}
+    <div class="xpbar"><div class="row"><span>Level <b>${lv}</b> · ${rank(lv)}</span><span><b>${into}</b> / ${XP_PER_LEVEL}</span></div><div class="progress"><i id="ovFill" style="width:${lv > lvBefore ? 0 : Math.max(0, (into - gained) / XP_PER_LEVEL * 100)}%"></i></div></div>
+    <button class="btn block" id="ovBack">Back to the map</button>
+  </div>`;
+  ov.hidden = false;
+  requestAnimationFrame(() => { ov.classList.add('show'); setTimeout(() => { const f = $('#ovFill'); if (f) f.style.width = (into / XP_PER_LEVEL * 100) + '%'; }, 350); });
+  $('#ovBack').focus();
+  $('#ovBack').addEventListener('click', () => {
+    ov.classList.remove('show'); setTimeout(() => { ov.hidden = true; }, 250);
+    renderAll(); go('explore');
+  });
+  renderAll();
+}
+
+/* ---------- Log ---------- */
+function renderLog() {
+  const active = S.quests.filter(q => q.status === 'active');
+  const posted = S.quests.filter(q => q.mine);
+  const done = S.quests.filter(q => q.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  $('#cActive').textContent = active.length || '';
+  $('#cPosted').textContent = posted.length || '';
+  $('#cDone').textContent = done.length || '';
+  $$('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.seg === S.seg));
+  const el = $('#logList');
+  if (S.seg === 'active') {
+    el.innerHTML = active.length ? active.map(q => {
+      const n = q.progress.filter(Boolean).length, t = q.steps.length;
+      const next = q.steps[q.progress.findIndex(p => !p)];
+      return `<div class="active-card">
+        <button class="active-top" data-open="${q.code}">
+          <span class="ctrl active">${icon(q.cat)}<b>${q.code}</b></span>
+          <span class="qbody"><span class="qtitle">${esc(q.title)}</span><span class="qmeta"><span>${icon('cal')}${esc(q.when)}</span><span>${icon('pin')}${esc(q.area)}</span></span></span>
+          <span class="qreward"><span class="usd">$${q.reward}</span><span class="xp">+${xpFor(q)} XP</span></span>
+        </button>
+        <div class="active-mid">
+          <div class="row"><span>${n === t ? 'All steps done' : 'Next: ' + esc(next)}</span><span class="mono">${n}/${t}</span></div>
+          <div class="progress"><i style="width:${n / t * 100}%"></i></div>
+        </div>
+        <div class="active-foot"><button class="btn sm ${n === t ? '' : 'ghost'}" data-open="${q.code}">${n === t ? 'Turn in' : 'Open steps'}</button></div>
+      </div>`;
+    }).join('') : `<div class="empty">${icon('flag')}<h3>No active quests</h3><p>Pick one from the map. It lands here with its steps so you can track it.</p><button class="btn sm" data-tab-go="explore">Find a quest</button></div>`;
+  } else if (S.seg === 'posted') {
+    el.innerHTML = posted.length ? posted.map(q => qcard(q, '<span class="tag hot">Waiting for a helper</span>')).join('')
+      : `<div class="empty">${icon('bolt')}<h3>Nothing posted yet</h3><p>Need a hand with something? Post a quest and set your reward.</p><button class="btn sm" data-tab-go="post">Post a quest</button></div>`;
+  } else {
+    el.innerHTML = done.length ? done.map(q => qcard(q)).join('')
+      : `<div class="empty">${icon('check')}<h3>No finished quests yet</h3><p>Quests you turn in show up here with what you earned.</p></div>`;
+  }
+}
+$$('.seg button').forEach(b => b.addEventListener('click', () => { S.seg = b.dataset.seg; save(); renderLog(); }));
+
+/* ---------- Post ---------- */
+let pCat = 'errands', pReward = 25;
+function renderPostCats() {
+  $('#pCats').innerHTML = Object.keys(CATS).map(k => `<button type="button" class="catopt" data-pcat="${k}" aria-pressed="${k === pCat}">${icon(k)}${CATS[k].replace(' help', '')}</button>`).join('');
+}
+function updatePreview() {
+  const mins = +$('#pMins').value;
+  $('#pReward').textContent = `$${pReward}`;
+  $('#pvReward').textContent = `$${pReward}`;
+  $('#pvXp').textContent = `+${xpFor({ reward: pReward, mins, diff: 2 })} XP`;
+  $('#titleCount').textContent = `${$('#pTitle').value.length}/60`;
+}
+$('#pCats').addEventListener('click', e => { const b = e.target.closest('[data-pcat]'); if (!b) return; pCat = b.dataset.pcat; renderPostCats(); });
+$('#rMinus').addEventListener('click', () => { pReward = Math.max(5, pReward - 5); updatePreview(); });
+$('#rPlus').addEventListener('click', () => { pReward = Math.min(500, pReward + 5); updatePreview(); });
+['#pMins', '#pTitle'].forEach(s => $(s).addEventListener('input', updatePreview));
+$('#postForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const title = $('#pTitle').value.trim();
+  const steps = ['#pS1', '#pS2', '#pS3'].map(s => $(s).value.trim()).filter(Boolean);
+  const err = $('#postErr');
+  if (title.length < 4) { err.hidden = false; err.textContent = 'Give the quest a title of at least 4 characters.'; $('#pTitle').focus(); return; }
+  if (!steps.length) { err.hidden = false; err.textContent = 'Add at least one step so your helper knows what to do.'; $('#pS1').focus(); return; }
+  err.hidden = true;
+  const a = Math.random() * Math.PI * 2, r = .08 + Math.random() * .1;
+  const q = {
+    code: S.nextCode++, title, cat: pCat, reward: pReward, mins: +$('#pMins').value, when: $('#pWhen').value,
+    area: $('#pArea').value.trim() || 'Near you', diff: 2,
+    x: START.x + Math.cos(a) * r, y: START.y + Math.sin(a) * r * .8,
+    poster: { name: S.name, rating: 5, jobs: 0 }, desc: $('#pDesc').value.trim(), steps,
+    status: 'posted', progress: steps.map(() => false), mine: true, postedAt: Date.now()
+  };
+  S.quests.push(q); S.seg = 'posted'; save();
+  $('#postForm').reset(); pReward = 25; pCat = 'errands'; renderPostCats(); updatePreview();
+  renderAll(); go('log');
+  toast(`Quest ${q.code} is live. Nearby helpers can see it now.`);
+});
+
+/* ---------- Profile ---------- */
+const BADGES = [
+  { k: 'flag', name: 'First quest', how: 'Turn in 1 quest', got: s => s.done >= 1 },
+  { k: 'bolt', name: 'On a roll', how: 'Turn in 5 quests', got: s => s.done >= 5 },
+  { k: 'cash', name: 'Hundred club', how: 'Earn $100', got: s => s.earned >= 100 },
+  { k: 'heart', name: 'Good neighbor', how: 'Post a quest', got: s => s.posted >= 1 },
+  { k: 'sun', name: 'Early bird', how: 'Finish a quest due today', got: s => s.today >= 1 },
+  { k: 'crown', name: 'Trailblazer', how: 'Reach level 3', got: s => s.lv >= 3 }
+];
+function renderProfile() {
+  const done = S.quests.filter(q => q.status === 'done');
+  const posted = S.quests.filter(q => q.mine).length;
+  const lv = level(S.xp), into = S.xp % XP_PER_LEVEL;
+  const st = { done: done.length, earned: S.earned, posted, lv, today: done.filter(q => /^Today/.test(q.when)).length };
+  if (document.activeElement !== $('#meName')) $('#meName').value = S.name;
+  $('#meAvatar').textContent = initials(S.name);
+  $('#meRank').textContent = `Level ${lv} · ${rank(lv)}`;
+  $('#xpLvl').textContent = lv; $('#xpNow').textContent = into; $('#xpNeed').textContent = XP_PER_LEVEL;
+  $('#xpFill').style.width = (into / XP_PER_LEVEL * 100) + '%';
+  $('#xpNext').textContent = `${XP_PER_LEVEL - into} XP to ${rank(lv + 1)}`;
+  $('#stEarned').textContent = `$${S.earned}`; $('#stDone').textContent = done.length; $('#stPosted').textContent = posted;
+  const codes = done.map(q => q.code);
+  $('#punchCount').textContent = `${Math.min(codes.length, 12)} / 12`;
+  $('#punches').innerHTML = Array.from({ length: 12 }, (_, i) => {
+    const c = codes[i];
+    // pin-punch pattern: each code gets its own dot pattern, like a real control punch
+    const dots = c ? Array.from({ length: 9 }, (_, j) => ((c * 7 + j * 3) % 5 > 1) ? `<circle cx="${4 + (j % 3) * 8}" cy="${4 + Math.floor(j / 3) * 8}" r="2.4" fill="currentColor"/>` : '').join('') : '';
+    return `<div class="punch ${c ? 'hit' : ''}"><span class="lbl">${i + 1}</span>${c ? `<svg viewBox="0 0 24 24" aria-label="Control ${c}">${dots}</svg>` : ''}</div>`;
+  }).join('');
+  $('#badges').innerHTML = BADGES.map(b => {
+    const got = b.got(st);
+    return `<div class="badge-c ${got ? 'got' : ''}"><span class="seal">${icon(b.k)}</span><b>${b.name}</b><span>${got ? 'Earned' : b.how}</span></div>`;
+  }).join('');
+}
+$('#meName').addEventListener('input', e => { S.name = e.target.value.trim() || 'Adventurer'; save(); $('#meAvatar').textContent = initials(S.name); });
+$('#resetRow').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'resetBtn') {
+    $('#resetRow').innerHTML = `<span style="flex-basis:100%;font-size:13px;font-weight:600">This clears your XP, earnings and posted quests.</span><button class="btn sm" id="resetYes" type="button">Yes, start over</button><button class="btn sm line" id="resetNo" type="button">Keep my progress</button>`;
+  } else if (b.id === 'resetYes') {
+    const keepName = S.name; S = fresh(); S.name = keepName; save();
+    $('#resetRow').innerHTML = '<button class="btn sm line" id="resetBtn" type="button">Start over</button>';
+    renderAll(); toast('Fresh start. All sample quests are back on the map.');
+  } else {
+    $('#resetRow').innerHTML = '<button class="btn sm line" id="resetBtn" type="button">Start over</button>';
+  }
+});
+
+/* ---------- Wallet (sheet) ---------- */
+function openWallet() {
+  const done = S.quests.filter(q => q.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  sheetCode = -1; lastFocus = document.activeElement;
+  $('#sheetBody').innerHTML = `
+    <div class="d-head"><span class="eyebrow">Wallet</span><h2 class="d-title" id="sheetTitle">$${S.earned}.00</h2><span style="color:var(--muted)">Earned from ${done.length} quest${done.length === 1 ? '' : 's'}. Payouts go to your bank every Friday.</span></div>
+    <div class="d-section"><h3>History</h3>
+    ${done.length ? `<div class="quests">${done.map(q => `<div class="poster"><span class="ctrl done" style="width:40px;height:40px">${icon('check')}</span><span class="who"><b>${esc(q.title)}</b><span>Control ${q.code} · ${esc(q.area)}</span></span><b class="mono">+$${q.reward}</b></div>`).join('')}</div>`
+      : '<p>Nothing yet. Turn in your first quest and the payment shows up here.</p>'}
+    </div>`;
+  $('#sheetFoot').innerHTML = '<button class="btn line block" data-act="close">Close</button>';
+  const sc = $('#scrim'), sh = $('#sheet');
+  sc.hidden = false; sh.hidden = false;
+  requestAnimationFrame(() => { sc.classList.add('show'); sh.classList.add('show'); });
+  setTimeout(() => $('#sheetClose').focus(), 50);
+}
+
+/* ---------- Navigation ---------- */
+const SCREENS = ['explore', 'log', 'post', 'profile'];
+function go(name, push = true) {
+  if (name === 'earn') return openWallet();
+  if (!SCREENS.includes(name)) name = 'explore';
+  SCREENS.forEach(s => $('#' + s).hidden = s !== name);
+  $$('.tab').forEach(t => { if (t.dataset.tab === name) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
+  if (push && location.hash !== '#' + name) { try { history.replaceState(null, '', '#' + name); } catch (e) { location.hash = name; } }
+  window.scrollTo(0, 0);
+  if (name === 'explore') requestAnimationFrame(drawMap);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]'); if (t) return go(t.dataset.tab);
+  const g = e.target.closest('[data-tab-go]'); if (g) return go(g.dataset.tabGo);
+  const o = e.target.closest('[data-open]'); if (o) return openSheet(+o.dataset.open);
+  const c = e.target.closest('[data-cat]'); if (c) { S.filter = c.dataset.cat; save(); renderExplore(); return; }
+  const s = e.target.closest('[data-sort]'); if (s) { S.sort = s.dataset.sort; save(); renderExplore(); return; }
+});
+$('#lvlPill').addEventListener('click', () => go('profile'));
+window.addEventListener('hashchange', () => go(location.hash.slice(1), false));
+
+function renderAll() { renderHeader(); renderExplore(); renderLog(); renderProfile(); }
+
+/* ---------- Theme + resize redraw ---------- */
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawMap, 100); });
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawMap); } catch (e) {}
+new MutationObserver(drawMap).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawMap);
+
+/* ---------- Install to home screen ---------- */
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let deferredPrompt = null;
+function showInstall() {
+  if (standalone || S.installDismissed) return;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  $('#installHow').textContent = ios ? ' Tap the Share button, then Add to Home Screen.' : ' Open your browser menu and choose Install app or Add to Home screen.';
+  $('#installHint').hidden = false;
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  $('#installBtn').hidden = false; $('#installHow').textContent = ' One tap, no app store.'; showInstall();
+});
+$('#installBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt(); try { await deferredPrompt.userChoice; } catch (e) {}
+  deferredPrompt = null; $('#installHint').hidden = true;
+});
+$('#installClose').addEventListener('click', () => { S.installDismissed = true; save(); $('#installHint').hidden = true; });
+if ('serviceWorker' in navigator && location.protocol === 'https:' && document.querySelector('link[rel="manifest"]')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  showInstall();
+}
+
+/* ---------- Boot ---------- */
+renderPostCats(); updatePreview(); renderAll();
+go(location.hash.slice(1) || 'explore', false);
+})();
+</script>
+</body>
+</html>
